@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@your-scope/signal-http-cache": "file:../../packages/core"
+  }
+}

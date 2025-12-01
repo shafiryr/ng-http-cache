@@ -1,0 +1,32 @@
+{
+  "name": "@your-scope/signal-http-cache",
+  "version": "0.0.1",
+  "description": "Signal-based HTTP cache and query state manager for Angular",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@angular/core": "^17.0.0 || ^18.0.0"
+  },
+  "devDependencies": {
+    "@angular/core": "^21.0.1",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "angular",
+    "signals",
+    "http",
+    "cache",
+    "state",
+    "query",
+    "fetch"
+  ],
+  "license": "MIT"
+}
