@@ -1,6 +1,14 @@
 {
-  "name": "@your-scope/signal-http-cache",
-  "version": "0.0.1",
+  "name": "@angular/signal-http-cache",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shafiryr/ng-http-cache"
+  },
+  "homepage": "https://github.com/shafiryr/ng-http-cache",
+  "bugs": {
+    "url": "https://github.com/shafiryr/ng-http-cache/issues"
+  },
   "description": "Signal-based HTTP cache and query state manager for Angular",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
