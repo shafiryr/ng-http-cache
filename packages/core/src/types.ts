@@ -1,4 +1,4 @@
-import { Signal } from '@angular/core';
+import { Signal } from "@angular/core";
 
 export interface HttpQuery<T> {
   data: Signal<T | null>;
@@ -9,9 +9,7 @@ export interface HttpQuery<T> {
   invalidate(): void;
 }
 
-export interface QueryOptions {
+export interface QueryOptions extends RequestInit {
   ttl: number;
   staleWhileRevalidate?: boolean;
-  method?: 'GET' | 'POST';
-  body?: any;
 }

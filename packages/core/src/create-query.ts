@@ -2,6 +2,11 @@ import { signal, DestroyRef, inject } from "@angular/core";
 import { cacheStore } from "./cache-store";
 import { HttpQuery, QueryOptions } from "./types";
 
+function normalizeBody(body: any) {
+  if (body === undefined || body === null) return undefined;
+  return typeof body === "string" ? body : JSON.stringify(body);
+}
+
 export function createHttpQuery<T>(
   url: string,
   options: QueryOptions,
@@ -59,6 +64,7 @@ export function createHttpQuery<T>(
     });
 
     const previous = cacheStore.get<T>(url);
+
     cacheStore.set(url, {
       data: previous?.data ?? null,
       timestamp: previous?.timestamp ?? 0,
@@ -68,9 +74,13 @@ export function createHttpQuery<T>(
 
     try {
       const response = await fetchFn(url, {
+        ...options,
         method: options.method ?? "GET",
-        headers: { "Content-Type": "application/json" },
-        body: options.body ? JSON.stringify(options.body) : undefined,
+        body: normalizeBody(options.body),
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers ?? {}),
+        },
       });
       const json = (await response.json()) as T;
 
