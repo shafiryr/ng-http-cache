@@ -1,5 +1,6 @@
 import { Signal } from "@angular/core";
 
+export type QueryKey = string | readonly [string, ...unknown[]];
 export interface HttpQueryError {
   message: string;
   status?: number;

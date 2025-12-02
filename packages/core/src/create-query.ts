@@ -1,6 +1,16 @@
 import { signal, DestroyRef, inject } from "@angular/core";
 import { cacheStore } from "./cache-store";
-import { HttpQuery, HttpQueryError, QueryOptions } from "./types";
+import { HttpQuery, HttpQueryError, QueryKey, QueryOptions } from "./types";
+
+function resolveQueryKey(key: QueryKey): { cacheKey: string; url: string } {
+  if (typeof key === "string") {
+    return { cacheKey: key, url: key };
+  }
+
+  const [url] = key;
+  const cacheKey = JSON.stringify(key);
+  return { cacheKey, url };
+}
 
 function normalizeBody(body: any) {
   if (body === undefined || body === null) return undefined;
@@ -25,10 +35,12 @@ function toHttpQueryError(err: unknown): HttpQueryError {
 }
 
 export function createHttpQuery<T>(
-  url: string,
+  key: QueryKey,
   options: QueryOptions,
   fetchFn: typeof fetch = fetch
 ): HttpQuery<T> {
+  const { cacheKey, url } = resolveQueryKey(key);
+
   const data = signal<T | null>(null);
   const loading = signal(false);
   const error = signal<HttpQueryError | null>(null);
@@ -36,11 +48,11 @@ export function createHttpQuery<T>(
   // auto cleanup on destroy
   const destroyRef = inject(DestroyRef);
   destroyRef.onDestroy(() => {
-    cacheStore.delete(url);
+    cacheStore.delete(cacheKey);
   });
 
   async function fetchData(force = false): Promise<void> {
-    const cached = cacheStore.get<T>(url);
+    const cached = cacheStore.get<T>(cacheKey);
 
     if (cached?.inFlight && !force) {
       try {
@@ -82,7 +94,7 @@ export function createHttpQuery<T>(
 
     const previous = cacheStore.get<T>(url);
 
-    cacheStore.set(url, {
+    cacheStore.set(cacheKey, {
       data: previous?.data ?? null,
       timestamp: previous?.timestamp ?? 0,
       ttl: options.ttl,
@@ -101,7 +113,7 @@ export function createHttpQuery<T>(
       });
       const json = (await response.json()) as T;
 
-      cacheStore.set(url, {
+      cacheStore.set(cacheKey, {
         data: json,
         timestamp: Date.now(),
         ttl: options.ttl,
@@ -119,7 +131,7 @@ export function createHttpQuery<T>(
   }
 
   function invalidate() {
-    cacheStore.delete(url);
+    cacheStore.delete(cacheKey);
   }
 
   return { data, loading, error, fetch: fetchData, invalidate };

@@ -62,6 +62,41 @@ const error = itemsQuery.error();
 
 ---
 
+## 🔑 Query Keys
+
+By default, `createHttpQuery` caches requests based solely on the URL.  
+However, many applications need to cache multiple states of the **same URL**,  
+such as pagination, filtering, sorting, or dynamic parameters.
+
+To support this, the library allows using a **Query Key**.
+
+A **Query Key** is either:
+
+### ✔ A simple URL string
+
+```ts
+const usersQuery = createHttpQuery('/api/users', {
+  ttl: 60000
+});
+```
+
+### ✔ A Query Key array
+
+A **Query Key** is an array whose first element must be the request URL,  
+and the rest can include any parameters that affect the result:
+
+```ts
+const usersQuery = createHttpQuery(
+  ['/api/users', page(), searchTerm(), sortBy()],
+  {
+    ttl: 30000,
+    staleWhileRevalidate: true
+  }
+);
+```
+
+---
+
 ### Force Refresh
 
 ```ts
