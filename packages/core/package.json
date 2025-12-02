@@ -1,9 +1,9 @@
 {
-  "name": "@angular/signal-http-cache",
-  "version": "1.0.0",
+  "name": "@shafiryr/signal-http-cache",
+  "version": "0.1.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/shafiryr/ng-http-cache"
+    "url": "git+https://github.com/shafiryr/ng-http-cache.git"
   },
   "homepage": "https://github.com/shafiryr/ng-http-cache",
   "bugs": {
@@ -36,5 +36,10 @@
     "query",
     "fetch"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "rxjs": "^7.8.2",
+    "tslib": "^2.8.1"
+  },
+  "author": "yaronshafir"
 }

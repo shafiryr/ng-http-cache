@@ -1,20 +1,19 @@
-/// <reference lib="dom" />
 import { signal } from "@angular/core";
 import { cacheStore } from "./cache-store";
-export function createHttpQuery(url, options) {
+export function createHttpQuery(url, options, fetchFn = fetch) {
     const data = signal(null);
     const loading = signal(false);
     const error = signal(null);
-    async function fetch(force = false) {
-        const cache = cacheStore.get(url);
-        if (cache && !force) {
-            const expired = Date.now() - cache.timestamp > options.ttl;
+    async function fetchData(force = false) {
+        const cached = cacheStore.get(url);
+        if (cached && !force) {
+            const expired = Date.now() - cached.timestamp > options.ttl;
             if (!expired) {
-                data.set(cache.data);
+                data.set(cached.data);
                 return;
             }
             if (options.staleWhileRevalidate) {
-                data.set(cache.data);
+                data.set(cached.data);
                 return revalidate();
             }
         }
@@ -24,7 +23,7 @@ export function createHttpQuery(url, options) {
         loading.set(true);
         error.set(null);
         try {
-            const response = await fetch(url, {
+            const response = await fetchFn(url, {
                 method: options.method ?? "GET",
                 headers: { "Content-Type": "application/json" },
                 body: options.body ? JSON.stringify(options.body) : undefined,
@@ -47,5 +46,5 @@ export function createHttpQuery(url, options) {
     function invalidate() {
         cacheStore.delete(url);
     }
-    return { data, loading, error, fetch, invalidate };
+    return { data, loading, error, fetch: fetchData, invalidate };
 }

@@ -1,7 +1,8 @@
-# @your-scope/signal-http-cache
+# @shafiryr/signal-http-cache
+
 A lightweight, Angular-friendly HTTP caching solution powered by **Signals**.
 
-[![npm version](https://img.shields.io/npm/v/@your-scope/signal-http-cache.svg)]()
+[![npm version](https://img.shields.io/npm/v/@shafiryr/signal-http-cache.svg)]()
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)]()
 
 ---
@@ -12,13 +13,13 @@ A lightweight, Angular-friendly HTTP caching solution powered by **Signals**.
 
 It provides:
 
-- ⚡ Smart HTTP caching with TTL  
-- 🔄 Stale-While-Revalidate behavior  
-- 🚫 Automatic in-flight deduplication (no duplicate requests)  
-- 🔥 Fully reactive state (`data`, `loading`, `error`)  
-- 🌐 Optional custom `fetch` for SSR compatibility  
-- 🧩 Framework-agnostic core, Angular-ready by design  
-- 📦 Zero dependencies  
+- ⚡ Smart HTTP caching with TTL
+- 🔄 Stale-While-Revalidate behavior
+- 🚫 Automatic in-flight deduplication (no duplicate requests)
+- 🔥 Fully reactive state (`data`, `loading`, `error`)
+- 🌐 Optional custom `fetch` for SSR compatibility
+- 🧩 Framework-agnostic core, Angular-ready by design
+- 📦 Zero dependencies
 
 The result is a simple but powerful data-fetching mechanism that works seamlessly with Angular.
 
@@ -27,7 +28,7 @@ The result is a simple but powerful data-fetching mechanism that works seamlessl
 ## 📦 Installation
 
 ```bash
-npm install @your-scope/signal-http-cache
+npm install @shafiryr/signal-http-cache
 ```
 
 ---
@@ -45,10 +46,10 @@ npm install @your-scope/signal-http-cache
 Below is an example of how to use `createHttpQuery` with Angular signals:
 
 ```ts
-import { createHttpQuery } from '@your-scope/signal-http-cache';
-import { computed } from '@angular/core';
+import { createHttpQuery } from "@shafiryr/signal-http-cache";
+import { computed } from "@angular/core";
 
-const itemsQuery = createHttpQuery<{ name: string }[]>('/api/items', {
+const itemsQuery = createHttpQuery<{ name: string }[]>("/api/items", {
   ttl: 60000,
   staleWhileRevalidate: true,
 });
@@ -59,7 +60,7 @@ const loading = computed(() => itemsQuery.loading());
 const error = computed(() => itemsQuery.error());
 ```
 
-### Force Refresh (bypass cache)
+### Force Refresh
 
 ```ts
 itemsQuery.fetch(true);
@@ -69,38 +70,43 @@ itemsQuery.fetch(true);
 
 ```ts
 itemsQuery.invalidate();
-
 ```
 
 ## Angular Component Example
 
 ```ts
-import { Component, computed, OnInit } from '@angular/core';
-import { createHttpQuery } from '@your-scope/signal-http-cache';
+import { Component, computed, OnInit } from "@angular/core";
+import { createHttpQuery } from "@shafiryr/signal-http-cache";
 
 @Component({
-  selector: 'app-items',
+  selector: "app-items",
   standalone: true,
   template: `
-    <div *ngIf="loading()">Loading...</div>
-    <div *ngIf="error()">{{ error() }}</div>
-
-    <ul *ngIf="data()">
-      <li *ngFor="let item of data()">{{ item.name }}</li>
+    @if (loading()) {
+    <div>Loading...</div>
+    } @if (error()) {
+    <div>{{ error() }}</div>
+    } @if (data()) {
+    <ul>
+      @for(item of data(); track $index) {
+      <li>
+        {{ item.name }}
+      </li>
+      }
     </ul>
-
+    }
     <button (click)="refresh()">Refresh</button>
   `,
 })
 export class ItemsComponent implements OnInit {
-  private query = createHttpQuery<{ name: string }[]>('/api/items', {
+  private query = createHttpQuery<{ name: string }[]>("/api/items", {
     ttl: 60000,
     staleWhileRevalidate: true,
   });
 
-  data = computed(() => this.query.data());
-  loading = computed(() => this.query.loading());
-  error = computed(() => this.query.error());
+  data = this.query.data;
+  loading = this.query.loading;
+  error = this.query.error;
 
   ngOnInit() {
     this.query.fetch();
@@ -111,7 +117,3 @@ export class ItemsComponent implements OnInit {
   }
 }
 ```
-
-
-
-
