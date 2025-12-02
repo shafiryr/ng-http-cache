@@ -55,10 +55,12 @@ const itemsQuery = createHttpQuery<{ name: string }[]>("/api/items", {
 });
 
 // Reactive state
-const data = computed(() => itemsQuery.data());
-const loading = computed(() => itemsQuery.loading());
-const error = computed(() => itemsQuery.error());
+const data = itemsQuery.data();
+const loading = itemsQuery.loading();
+const error = itemsQuery.error();
 ```
+
+---
 
 ### Force Refresh
 
@@ -66,11 +68,15 @@ const error = computed(() => itemsQuery.error());
 itemsQuery.fetch(true);
 ```
 
+---
+
 ### Invalidate Cache
 
 ```ts
 itemsQuery.invalidate();
 ```
+
+---
 
 ## Angular Component Example
 
@@ -117,3 +123,70 @@ export class ItemsComponent implements OnInit {
   }
 }
 ```
+
+---
+
+# 📡 Using Angular HttpClient (Optional)
+
+By default, **Signal HTTP Cache** uses the native browser **fetch API**.  
+This keeps the library framework-agnostic, lightweight, and compatible with:
+
+- Angular standalone applications  
+- SSR environments  
+- Node workers  
+- Custom fetch implementations  
+
+However, if you prefer to route your HTTP requests through Angular’s **HttpClient**  
+(for interceptors, authentication pipelines, auth tokens, logging, etc.),  
+you can easily provide your own adapter function.
+
+This is **optional** - the library does **not** require `HttpClient`.
+
+## HttpClient → Fetch Adapter
+
+Create a small function that mimics the behavior of `fetch` using Angular’s `HttpClient`.
+
+```ts
+// http-client-fetch-adapter.ts
+
+import { inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+
+export function httpClientFetchAdapter(url: string, init?: RequestInit) {
+  const http = inject(HttpClient);
+
+  const method = init?.method ?? 'GET';
+  const body = init?.body ? JSON.parse(init.body as string) : undefined;
+  const headers = init?.headers ?? {};
+
+  return firstValueFrom(
+    http.request(method, url, {
+      body,
+      headers,
+      responseType: 'json'
+    })
+  ).then(data => {
+    return {
+      ok: true,
+      json: () => Promise.resolve(data)
+    } as Response;
+  });
+}
+```
+
+## Using the Adapter
+
+Pass your adapter as the third argument to `createHttpQuery`:
+
+```ts
+import { createHttpQuery } from '@shafiryr/signal-http-cache';
+import { httpClientFetchAdapter } from './http-client-fetch-adapter';
+
+query = createHttpQuery<Item[]>('/api/items', {
+  ttl: 60000,
+  staleWhileRevalidate: true
+}, httpClientFetchAdapter);
+```
+
+
