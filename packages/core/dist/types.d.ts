@@ -1,14 +1,19 @@
-import { Signal } from '@angular/core';
+import { Signal } from "@angular/core";
+export type QueryKey = string | readonly [string, ...unknown[]];
+export interface HttpQueryError {
+    message: string;
+    status?: number;
+    statusText?: string;
+    cause?: unknown;
+}
 export interface HttpQuery<T> {
     data: Signal<T | null>;
     loading: Signal<boolean>;
-    error: Signal<string | null>;
+    error: Signal<HttpQueryError | null>;
     fetch(force?: boolean): Promise<void>;
     invalidate(): void;
 }
-export interface QueryOptions {
+export interface QueryOptions extends RequestInit {
     ttl: number;
     staleWhileRevalidate?: boolean;
-    method?: 'GET' | 'POST';
-    body?: any;
 }

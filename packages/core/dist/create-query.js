@@ -1,23 +1,52 @@
 import { signal, DestroyRef, inject } from "@angular/core";
 import { cacheStore } from "./cache-store";
-export function createHttpQuery(url, options, fetchFn = fetch) {
+function resolveQueryKey(key) {
+    if (typeof key === "string") {
+        return { cacheKey: key, url: key };
+    }
+    const [url] = key;
+    const cacheKey = JSON.stringify(key);
+    return { cacheKey, url };
+}
+function normalizeBody(body) {
+    if (body === undefined || body === null)
+        return undefined;
+    return typeof body === "string" ? body : JSON.stringify(body);
+}
+function toHttpQueryError(err) {
+    if (typeof err === "object" && err && "message" in err) {
+        const anyErr = err;
+        return {
+            message: String(anyErr.message ?? "Request failed"),
+            status: anyErr.status,
+            statusText: anyErr.statusText,
+            cause: err,
+        };
+    }
+    return {
+        message: "Request failed",
+        cause: err,
+    };
+}
+export function createHttpQuery(key, options, fetchFn = fetch) {
+    const { cacheKey, url } = resolveQueryKey(key);
     const data = signal(null);
     const loading = signal(false);
     const error = signal(null);
     // auto cleanup on destroy
     const destroyRef = inject(DestroyRef);
     destroyRef.onDestroy(() => {
-        cacheStore.delete(url);
+        cacheStore.delete(cacheKey);
     });
     async function fetchData(force = false) {
-        const cached = cacheStore.get(url);
+        const cached = cacheStore.get(cacheKey);
         if (cached?.inFlight && !force) {
             try {
                 const result = await cached.inFlight;
                 data.set(result);
             }
             catch (e) {
-                error.set(e.message);
+                error.set(toHttpQueryError(e));
             }
             return;
         }
@@ -44,7 +73,7 @@ export function createHttpQuery(url, options, fetchFn = fetch) {
             rejectFn = reject;
         });
         const previous = cacheStore.get(url);
-        cacheStore.set(url, {
+        cacheStore.set(cacheKey, {
             data: previous?.data ?? null,
             timestamp: previous?.timestamp ?? 0,
             ttl: options.ttl,
@@ -52,12 +81,16 @@ export function createHttpQuery(url, options, fetchFn = fetch) {
         });
         try {
             const response = await fetchFn(url, {
+                ...options,
                 method: options.method ?? "GET",
-                headers: { "Content-Type": "application/json" },
-                body: options.body ? JSON.stringify(options.body) : undefined,
+                body: normalizeBody(options.body),
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(options.headers ?? {}),
+                },
             });
             const json = (await response.json());
-            cacheStore.set(url, {
+            cacheStore.set(cacheKey, {
                 data: json,
                 timestamp: Date.now(),
                 ttl: options.ttl,
@@ -68,14 +101,14 @@ export function createHttpQuery(url, options, fetchFn = fetch) {
         }
         catch (e) {
             rejectFn(e);
-            error.set(e.message);
+            error.set(toHttpQueryError(e));
         }
         finally {
             loading.set(false);
         }
     }
     function invalidate() {
-        cacheStore.delete(url);
+        cacheStore.delete(cacheKey);
     }
     return { data, loading, error, fetch: fetchData, invalidate };
 }

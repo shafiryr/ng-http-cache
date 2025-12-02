@@ -1,2 +1,2 @@
-import { HttpQuery, QueryOptions } from "./types";
-export declare function createHttpQuery<T>(url: string, options: QueryOptions, fetchFn?: typeof fetch): HttpQuery<T>;
+import { HttpQuery, QueryKey, QueryOptions } from "./types";
+export declare function createHttpQuery<T>(key: QueryKey, options: QueryOptions, fetchFn?: typeof fetch): HttpQuery<T>;
