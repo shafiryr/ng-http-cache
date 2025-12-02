@@ -1,10 +1,27 @@
 import { signal, DestroyRef, inject } from "@angular/core";
 import { cacheStore } from "./cache-store";
-import { HttpQuery, QueryOptions } from "./types";
+import { HttpQuery, HttpQueryError, QueryOptions } from "./types";
 
 function normalizeBody(body: any) {
   if (body === undefined || body === null) return undefined;
   return typeof body === "string" ? body : JSON.stringify(body);
+}
+
+function toHttpQueryError(err: unknown): HttpQueryError {
+  if (typeof err === "object" && err && "message" in err) {
+    const anyErr = err as any;
+    return {
+      message: String(anyErr.message ?? "Request failed"),
+      status: anyErr.status,
+      statusText: anyErr.statusText,
+      cause: err,
+    };
+  }
+
+  return {
+    message: "Request failed",
+    cause: err,
+  };
 }
 
 export function createHttpQuery<T>(
@@ -14,7 +31,7 @@ export function createHttpQuery<T>(
 ): HttpQuery<T> {
   const data = signal<T | null>(null);
   const loading = signal(false);
-  const error = signal<string | null>(null);
+  const error = signal<HttpQueryError | null>(null);
 
   // auto cleanup on destroy
   const destroyRef = inject(DestroyRef);
@@ -30,7 +47,7 @@ export function createHttpQuery<T>(
         const result = await cached.inFlight;
         data.set(result);
       } catch (e) {
-        error.set((e as Error).message);
+        error.set(toHttpQueryError(e));
       }
       return;
     }
@@ -95,7 +112,7 @@ export function createHttpQuery<T>(
       data.set(json);
     } catch (e) {
       rejectFn(e);
-      error.set((e as Error).message);
+      error.set(toHttpQueryError(e));
     } finally {
       loading.set(false);
     }
