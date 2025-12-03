@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output (optional - some prefer to commit dist)
+dist/
+
+# npm pack output
+*.tgz
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*

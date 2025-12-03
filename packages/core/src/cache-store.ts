@@ -1,9 +1,10 @@
-interface CacheEntry<T> {
-  data: T;
+export interface CacheEntry<T> {
+  data: T | null;
   timestamp: number;
   ttl: number;
   inFlight?: Promise<T>;
   abortController?: AbortController;
+  refCount: number;
 }
 
 const cache = new Map<string, CacheEntry<any>>();
@@ -25,5 +26,22 @@ export const cacheStore = {
       entry.abortController?.abort();
     }
     cache.clear();
+  },
+  incrementRef(key: string) {
+    const entry = cache.get(key);
+    if (entry) {
+      entry.refCount++;
+    }
+  },
+  decrementRef(key: string): boolean {
+    const entry = cache.get(key);
+    if (entry) {
+      entry.refCount--;
+      if (entry.refCount <= 0) {
+        this.delete(key);
+        return true;
+      }
+    }
+    return false;
   },
 };

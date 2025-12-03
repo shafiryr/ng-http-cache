@@ -1,25 +1,26 @@
 # @shafiryr/signal-http-cache
 
-A lightweight, Angular-friendly HTTP caching solution powered by **Signals**.
+A lightweight, Signal-powered HTTP caching library for Angular.
 
-[![npm version](https://img.shields.io/npm/v/@shafiryr/signal-http-cache.svg)]()
-[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)]()
+[![npm version](https://img.shields.io/npm/v/@shafiryr/signal-http-cache.svg)](https://www.npmjs.com/package/@shafiryr/signal-http-cache)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Angular](https://img.shields.io/badge/Angular-16+-dd0031.svg)](https://angular.io/)
 
 ---
 
-## 🚀 Overview
+## ✨ Features
 
-**signal-http-cache** is a fast, minimal and elegant HTTP caching utility designed for Angular 17+ using the new **Signals** reactivity model.
-
-- ⚡ Smart HTTP caching with TTL
-- 🔄 Stale-While-Revalidate behavior
-- 🚫 Automatic in-flight deduplication (no duplicate requests)
-- 🧠 Pure Signals-based reactivity (no RxJS required, no subscriptions)
-- 🧹 Automatic cleanup via Angular DestroyRef
-- 🔥 Fully reactive state (`data`, `loading`, `error`)
-- 🌐 Optional custom `fetch` for SSR and `HttpClient` adapters
-- 🧩 Framework-agnostic core, Angular-ready by design
-- 📦 Zero dependencies
+| Feature | Description |
+|---------|-------------|
+| ⚡ **TTL-based Caching** | Automatic cache expiration with configurable time-to-live |
+| 🔄 **Stale-While-Revalidate** | Serve cached data instantly while fetching fresh data in background |
+| 🚫 **Request Deduplication** | Automatic in-flight request deduplication - no duplicate API calls |
+| 🎯 **Race Condition Prevention** | Force refresh aborts previous pending requests |
+| 🧠 **Pure Signals** | Native Angular Signals - no RxJS, no subscriptions |
+| 🧹 **Auto Cleanup** | Automatic cache cleanup via Angular `DestroyRef` |
+| 🔗 **Shared Cache** | Multiple components share the same cache with reference counting |
+| 🛑 **Request Cancellation** | AbortController support for cancelling requests |
+| 🌐 **Custom Fetch** | Use native `fetch` or provide your own (HttpClient, SSR, etc.) |
 
 ---
 
@@ -34,7 +35,8 @@ npm install @shafiryr/signal-http-cache
 ### Peer Dependencies
 
 ```bash
-@angular/core ^17 || ^18
+|-----------------|------------|
+| `@angular/core` | `>=16.0.0` |
 ```
 
 ---
@@ -62,56 +64,56 @@ const error = itemsQuery.error();
 
 ## 🔑 Query Keys
 
-By default, `createHttpQuery` caches requests based solely on the URL.  
-However, many applications need to cache multiple states of the **same URL**,  
-such as pagination, filtering, sorting, or dynamic parameters.
+Query keys determine how requests are cached. Use them to cache different states of the same endpoint.
 
-To support this, the library allows using a **Query Key**.
-
-A **Query Key** is either:
-
-### ✔ A simple URL string
+### Simple URL
 
 ```ts
-const usersQuery = createHttpQuery('/api/users', {
-  ttl: 60000
-});
+const query = createHttpQuery('/api/users', { ttl: 60000 });
 ```
 
-### ✔ A Query Key array
-
-A **Query Key** is an array whose first element must be the request URL,  
-and the rest can include any parameters that affect the result:
+### Parameterized Query Key
 
 ```ts
-const usersQuery = createHttpQuery(
+const query = createHttpQuery(
   ['/api/users', page(), searchTerm(), sortBy()],
-  {
-    ttl: 30000,
-    staleWhileRevalidate: true
-  }
+  { ttl: 30000 }
 );
+```
+
+Each unique combination creates a separate cache entry, perfect for:
+- Pagination
+- Search/filtering
+- Sorting
+- Any dynamic parameters
+
+---
+
+### TTL (Time-to-Live)
+
+```ts
+const query = createHttpQuery('/api/data', {
+  ttl: 60000 // 60 seconds
+});
 ```
 
 ---
 
 ### Force Refresh
 
-Forces a fresh request, ignoring cache:
+Ignore cache, always fetch fresh data
 ```ts
-itemsQuery.fetch(true);
+await query.fetch(true);
 ```
-
----
 
 ### Invalidate Cache
 
-Deletes the cached value and aborts any in-flight request:
+Mark cache as stale and abort any pending request
 ```ts
-itemsQuery.invalidate();
+query.invalidate();
 ```
 
----
+----
 
 ## Angular Component Example
 
@@ -161,37 +163,25 @@ export class ItemsComponent implements OnInit {
 
 ---
 
-# 📡 Using Angular HttpClient (Optional)
+## 📡 Using Angular HttpClient (Optional)
 
-By default, **Signal HTTP Cache** uses the native browser **fetch API**.  
-This keeps the library framework-agnostic, lightweight, and compatible with:
-
-- Angular standalone applications  
-- SSR environments  
-- Node workers  
-- Custom fetch implementations  
-
-However, if you prefer to route your HTTP requests through Angular’s **HttpClient**  
-(for interceptors, authentication pipelines, auth tokens, logging, etc.),  
-you can easily provide your own adapter function.
+By default, the library uses the native browser `fetch` API. To use Angular's `HttpClient` instead (for interceptors, auth tokens, etc.), create an adapter:
 
 This is **optional** - the library does **not** require `HttpClient`.
 
-## HttpClient → Fetch Adapter
-
-Create a small function that mimics the behavior of `fetch` using Angular’s `HttpClient`.
+### HttpClient → Fetch Adapter
 
 ```ts
 // http-client-fetch-adapter.ts
 
-import { inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { inject } from "@angular/core";
+import { HttpClient } from "@angular/common/http";
+import { firstValueFrom } from "rxjs";
 
 export function httpClientFetchAdapter(url: string, init?: RequestInit) {
   const http = inject(HttpClient);
 
-  const method = init?.method ?? 'GET';
+  const method = init?.method ?? "GET";
   const body = init?.body ? JSON.parse(init.body as string) : undefined;
   const headers = init?.headers ?? {};
 
@@ -199,29 +189,33 @@ export function httpClientFetchAdapter(url: string, init?: RequestInit) {
     http.request(method, url, {
       body,
       headers,
-      responseType: 'json'
+      responseType: "json",
     })
-  ).then(data => {
+  ).then((data) => {
     return {
       ok: true,
-      json: () => Promise.resolve(data)
+      json: () => Promise.resolve(data),
     } as Response;
   });
 }
 ```
 
-## Using the Adapter
+### Using the Adapter
 
 Pass your adapter as the third argument to `createHttpQuery`:
 
 ```ts
-import { createHttpQuery } from '@shafiryr/signal-http-cache';
-import { httpClientFetchAdapter } from './http-client-fetch-adapter';
+import { createHttpQuery } from "@shafiryr/signal-http-cache";
+import { httpClientFetchAdapter } from "./http-client-fetch-adapter";
 
-query = createHttpQuery<Item[]>('/api/items', {
-  ttl: 60000,
-  staleWhileRevalidate: true
-}, httpClientFetchAdapter);
+query = createHttpQuery<Item[]>(
+  "/api/items",
+  {
+    ttl: 60000,
+    staleWhileRevalidate: true,
+  },
+  httpClientFetchAdapter
+);
 ```
 
 ---
@@ -229,5 +223,3 @@ query = createHttpQuery<Item[]>('/api/items', {
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
-
-
