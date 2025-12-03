@@ -81,6 +81,8 @@ export function createHttpQuery<T>(
   }
 
   async function revalidate(): Promise<void> {
+    const abortController = new AbortController();
+
     loading.set(true);
     error.set(null);
 
@@ -99,6 +101,7 @@ export function createHttpQuery<T>(
       timestamp: previous?.timestamp ?? 0,
       ttl: options.ttl,
       inFlight: inFlightPromise,
+      abortController,
     });
 
     try {
@@ -110,6 +113,7 @@ export function createHttpQuery<T>(
           "Content-Type": "application/json",
           ...(options.headers ?? {}),
         },
+        signal: abortController.signal,
       });
       const json = (await response.json()) as T;
 
@@ -118,6 +122,7 @@ export function createHttpQuery<T>(
         timestamp: Date.now(),
         ttl: options.ttl,
         inFlight: undefined,
+        abortController: undefined,
       });
 
       resolveFn(json);

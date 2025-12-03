@@ -11,17 +11,15 @@ A lightweight, Angular-friendly HTTP caching solution powered by **Signals**.
 
 **signal-http-cache** is a fast, minimal and elegant HTTP caching utility designed for Angular 17+ using the new **Signals** reactivity model.
 
-It provides:
-
 - ⚡ Smart HTTP caching with TTL
 - 🔄 Stale-While-Revalidate behavior
 - 🚫 Automatic in-flight deduplication (no duplicate requests)
+- 🧠 Pure Signals-based reactivity (no RxJS required, no subscriptions)
+- 🧹 Automatic cleanup via Angular DestroyRef
 - 🔥 Fully reactive state (`data`, `loading`, `error`)
-- 🌐 Optional custom `fetch` for SSR compatibility
+- 🌐 Optional custom `fetch` for SSR and `HttpClient` adapters
 - 🧩 Framework-agnostic core, Angular-ready by design
 - 📦 Zero dependencies
-
-The result is a simple but powerful data-fetching mechanism that works seamlessly with Angular.
 
 ---
 
@@ -230,6 +228,6 @@ query = createHttpQuery<Item[]>('/api/items', {
 
 ## 📄 License
 
-This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
 
