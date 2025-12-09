@@ -10,17 +10,23 @@ A lightweight, Signal-powered HTTP caching library for Angular.
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| ⚡ **TTL-based Caching** | Automatic cache expiration with configurable time-to-live |
-| 🔄 **Stale-While-Revalidate** | Serve cached data instantly while fetching fresh data in background |
-| 🚫 **Request Deduplication** | Automatic in-flight request deduplication - no duplicate API calls |
-| 🎯 **Race Condition Prevention** | Force refresh aborts previous pending requests |
-| 🧠 **Pure Signals** | Native Angular Signals - no RxJS, no subscriptions |
-| 🧹 **Auto Cleanup** | Automatic cache cleanup via Angular `DestroyRef` |
-| 🔗 **Shared Cache** | Multiple components share the same cache with reference counting |
-| 🛑 **Request Cancellation** | AbortController support for cancelling requests |
-| 🌐 **Custom Fetch** | Use native `fetch` or provide your own (HttpClient, SSR, etc.) |
+⚡ **TTL-based Caching** — Automatic cache expiration with configurable time-to-live
+
+🔄 **Stale-While-Revalidate** — Serve cached data instantly while fetching fresh data in background
+
+🚫 **Request Deduplication** — Multiple components share the same in-flight request
+
+🧠 **Pure Signals** — Native Angular Signals, no RxJS required
+
+🌐 **Custom Fetch** - Use native `fetch` or provide your own (HttpClient, SSR, etc.)
+
+🧹 **Auto Cleanup** — Automatic cache cleanup via Angular `DestroyRef`
+
+📝 **Mutations** — Full support for POST/PUT/DELETE with state tracking
+
+🔁 **Retry Support** — Configurable retry with exponential backoff
+
+🎯 **Race Condition Prevention** — Force refresh aborts previous pending requests
 
 ---
 
@@ -32,76 +38,52 @@ npm install @shafiryr/signal-http-cache
 
 ---
 
-### Peer Dependencies
+## 📌 Peer Dependencies
 
-```bash
-|-----------------|------------|
-| `@angular/core` | `>=16.0.0` |
-```
+`@angular/core >=16.0.0`
 
 ---
 
-## Basic Usage
+## 🔍 Queries
 
-Below is an example of how to use `createHttpQuery` with Angular signals:
+Use `createQuery` to fetch and cache data.
+
+### Basic Query
 
 ```ts
-import { createHttpQuery } from "@shafiryr/signal-http-cache";
-import { computed } from "@angular/core";
+import { createQuery } from "@shafiryr/signal-http-cache";
 
-const itemsQuery = createHttpQuery<{ name: string }[]>("/api/items", {
-  ttl: 60000,
-  staleWhileRevalidate: true,
-});
+const usersQuery = createQuery<User[]>("/api/users");
+
+// Fetch data
+await usersQuery.fetch();
 
 // Reactive state
-const data = itemsQuery.data();
-const loading = itemsQuery.loading();
-const error = itemsQuery.error();
+usersQuery.data();
+usersQuery.loading();
+usersQuery.error();
 ```
-
----
-
-## 🔑 Query Keys
-
-Query keys determine how requests are cached. Use them to cache different states of the same endpoint.
-
-### Simple URL
-
-```ts
-const query = createHttpQuery('/api/users', { ttl: 60000 });
-```
-
-### Parameterized Query Key
-
-```ts
-const query = createHttpQuery(
-  ['/api/users', page(), searchTerm(), sortBy()],
-  { ttl: 30000 }
-);
-```
-
-Each unique combination creates a separate cache entry, perfect for:
-- Pagination
-- Search/filtering
-- Sorting
-- Any dynamic parameters
-
----
 
 ### TTL (Time-to-Live)
 
 ```ts
-const query = createHttpQuery('/api/data', {
-  ttl: 60000 // 60 seconds
+const query = createQuery("/api/data", {
+  ttl: 60000, // Cache for 60 seconds
 });
 ```
 
----
+### Stale-While-Revalidate
+
+```ts
+const query = createQuery<Data>("/api/data", {
+  staleWhileRevalidate: true, // Show stale data while fetching
+});
+```
 
 ### Force Refresh
 
 Ignore cache, always fetch fresh data
+
 ```ts
 await query.fetch(true);
 ```
@@ -109,54 +91,127 @@ await query.fetch(true);
 ### Invalidate Cache
 
 Mark cache as stale and abort any pending request
+
 ```ts
 query.invalidate();
 ```
 
-----
+---
 
-## Angular Component Example
+### Parameterized Query Keys
+
+Query keys determine how requests are cached.
 
 ```ts
-import { Component, computed, OnInit } from "@angular/core";
-import { createHttpQuery } from "@shafiryr/signal-http-cache";
+const query = createQuery(["/api/users", page(), searchTerm(), sortBy()]);
+```
+
+Each unique combination creates a separate cache entry, perfect for:
+
+- Pagination
+- Search/filtering
+- Sorting
+- Any dynamic parameters
+
+---
+
+## ✏️ Mutations
+
+Use `createMutation` for data modifications (POST, PUT, DELETE).
+
+### Basic Mutation
+
+```ts
+import { createMutation } from "@shafiryr/signal-http-cache";
+
+const updateUser = createMutation<User, UpdateUserDto>("/api/users", {
+  method: "PUT",
+  onSuccess: () => toast.success("Saved!"),
+  onError: (err) => toast.error(err.message),
+  onFinally: () => closeModal(),
+});
+```
+
+---
+
+### Mutation with Retry
+
+---
+
+```ts
+const submitForm = createMutation<Response, FormData>("/api/submit", {
+  retry: 3,
+  retryDelay: (attempt) => 1000 * 2 ** attempt, // Exponential backoff
+});
+```
+
+## 🧩 Full Component Example
+
+```ts
+import { Component, OnInit } from "@angular/core";
+import { createQuery, createMutation } from "@shafiryr/signal-http-cache";
+
+interface Todo {
+  id: string;
+  title: string;
+}
 
 @Component({
-  selector: "app-items",
+  selector: "app-todos",
   standalone: true,
   template: `
     @if (loading()) {
-    <div>Loading...</div>
-    } @if (error()) {
-    <div>{{ error() }}</div>
-    } @if (data()) {
+    <p>Loading...</p>
+    } @if (todos()) {
     <ul>
-      @for(item of data(); track $index) {
+      @for (todo of todos(); track todo.id) {
       <li>
-        {{ item.name }}
+        {{ todo.title }}
+        <button
+          (click)="delete(todo.id)"
+          [disabled]="deleteMutation.isPending()"
+        >
+          Delete
+        </button>
       </li>
       }
     </ul>
     }
-    <button (click)="refresh()">Refresh</button>
+
+    <input #input type="text" placeholder="New todo" />
+    <button (click)="add(input)" [disabled]="addMutation.isPending()">
+      {{ addMutation.isPending() ? "Adding..." : "Add" }}
+    </button>
   `,
 })
-export class ItemsComponent implements OnInit {
-  private query = createHttpQuery<{ name: string }[]>("/api/items", {
-    ttl: 60000,
-    staleWhileRevalidate: true,
+export class TodosComponent implements OnInit {
+  private todosQuery = createQuery<Todo[]>("/api/todos", { ttl: 60000 });
+
+  addMutation = createMutation<Todo, { title: string }>("/api/todos", {
+    onSuccess: () => this.todosQuery.fetch(true),
   });
 
-  data = this.query.data;
-  loading = this.query.loading;
-  error = this.query.error;
+  deleteMutation = createMutation<void, string>("/api/todos", {
+    method: "DELETE",
+    invalidateKeys: ["/api/todos"],
+  });
+
+  todos = this.todosQuery.data;
+  loading = this.todosQuery.loading;
 
   ngOnInit() {
-    this.query.fetch();
+    this.todosQuery.fetch();
   }
 
-  refresh() {
-    this.query.fetch(true);
+  add(input: HTMLInputElement) {
+    if (input.value) {
+      this.addMutation.mutate({ title: input.value });
+      input.value = "";
+    }
+  }
+
+  delete(id: string) {
+    this.deleteMutation.mutate(id);
   }
 }
 ```
@@ -202,13 +257,13 @@ export function httpClientFetchAdapter(url: string, init?: RequestInit) {
 
 ### Using the Adapter
 
-Pass your adapter as the third argument to `createHttpQuery`:
+Pass your adapter as the third argument to `createQuery`:
 
 ```ts
-import { createHttpQuery } from "@shafiryr/signal-http-cache";
+import { createQuery } from "@shafiryr/signal-http-cache";
 import { httpClientFetchAdapter } from "./http-client-fetch-adapter";
 
-query = createHttpQuery<Item[]>(
+query = createQuery<Item[]>(
   "/api/items",
   {
     ttl: 60000,

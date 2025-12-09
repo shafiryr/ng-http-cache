@@ -33,30 +33,46 @@ export function createHttpQuery(key, options, fetchFn = fetch) {
     const data = signal(null);
     const loading = signal(false);
     const error = signal(null);
+    const existing = cacheStore.get(cacheKey);
+    if (existing) {
+        cacheStore.incrementRef(cacheKey);
+        // hydrate signal with existing cached data
+        if (existing.data !== null) {
+            data.set(existing.data);
+        }
+    }
     // auto cleanup on destroy
     const destroyRef = inject(DestroyRef);
     destroyRef.onDestroy(() => {
-        cacheStore.delete(cacheKey);
+        cacheStore.decrementRef(cacheKey);
     });
     async function fetchData(force = false) {
         const cached = cacheStore.get(cacheKey);
-        if (cached?.inFlight && !force) {
-            try {
-                const result = await cached.inFlight;
-                data.set(result);
+        if (cached?.inFlight) {
+            if (force) {
+                cached.abortController?.abort();
             }
-            catch (e) {
-                error.set(toHttpQueryError(e));
+            else {
+                try {
+                    const result = await cached.inFlight;
+                    error.set(null);
+                    data.set(result);
+                }
+                catch (e) {
+                    error.set(toHttpQueryError(e));
+                }
+                return;
             }
-            return;
         }
         if (cached && !force) {
             const expired = Date.now() - cached.timestamp > options.ttl;
             if (!expired) {
+                error.set(null);
                 data.set(cached.data);
                 return;
             }
             if (options.staleWhileRevalidate) {
+                error.set(null);
                 data.set(cached.data);
                 return revalidate();
             }
@@ -64,6 +80,7 @@ export function createHttpQuery(key, options, fetchFn = fetch) {
         return revalidate();
     }
     async function revalidate() {
+        const abortController = new AbortController();
         loading.set(true);
         error.set(null);
         let resolveFn;
@@ -72,12 +89,14 @@ export function createHttpQuery(key, options, fetchFn = fetch) {
             resolveFn = resolve;
             rejectFn = reject;
         });
-        const previous = cacheStore.get(url);
+        const previous = cacheStore.get(cacheKey);
         cacheStore.set(cacheKey, {
             data: previous?.data ?? null,
             timestamp: previous?.timestamp ?? 0,
             ttl: options.ttl,
             inFlight: inFlightPromise,
+            abortController,
+            refCount: previous?.refCount ?? 1,
         });
         try {
             const response = await fetchFn(url, {
@@ -85,21 +104,38 @@ export function createHttpQuery(key, options, fetchFn = fetch) {
                 method: options.method ?? "GET",
                 body: normalizeBody(options.body),
                 headers: {
-                    "Content-Type": "application/json",
+                    ...(options.body &&
+                        typeof options.body === "object" &&
+                        !(options.body instanceof FormData)
+                        ? { "Content-Type": "application/json" }
+                        : {}),
                     ...(options.headers ?? {}),
                 },
+                signal: abortController.signal,
             });
+            if (!response.ok) {
+                throw {
+                    message: `HTTP ${response.status}`,
+                    status: response.status,
+                    statusText: response.statusText,
+                };
+            }
             const json = (await response.json());
             cacheStore.set(cacheKey, {
                 data: json,
                 timestamp: Date.now(),
                 ttl: options.ttl,
                 inFlight: undefined,
+                abortController: undefined,
+                refCount: cacheStore.get(cacheKey)?.refCount ?? 1,
             });
             resolveFn(json);
             data.set(json);
         }
         catch (e) {
+            if (e instanceof DOMException && e.name === "AbortError") {
+                return;
+            }
             rejectFn(e);
             error.set(toHttpQueryError(e));
         }
@@ -108,7 +144,17 @@ export function createHttpQuery(key, options, fetchFn = fetch) {
         }
     }
     function invalidate() {
-        cacheStore.delete(cacheKey);
+        const entry = cacheStore.get(cacheKey);
+        if (entry) {
+            entry.abortController?.abort();
+            entry.timestamp = 0;
+        }
     }
-    return { data, loading, error, fetch: fetchData, invalidate };
+    return {
+        data: data.asReadonly(),
+        loading: loading.asReadonly(),
+        error: error.asReadonly(),
+        fetch: fetchData,
+        invalidate,
+    };
 }

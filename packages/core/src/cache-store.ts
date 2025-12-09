@@ -13,6 +13,12 @@ export const cacheStore = {
   get<T>(key: string) {
     return cache.get(key) as CacheEntry<T> | undefined;
   },
+  has(key: string): boolean {
+    return cache.has(key);
+  },
+  keys(): string[] {
+    return Array.from(cache.keys());
+  },
   set<T>(key: string, entry: CacheEntry<T>) {
     cache.set(key, entry);
   },
@@ -43,5 +49,8 @@ export const cacheStore = {
       }
     }
     return false;
+  },
+  size(): number {
+    return cache.size;
   },
 };

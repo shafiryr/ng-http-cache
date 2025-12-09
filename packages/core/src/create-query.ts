@@ -1,6 +1,7 @@
 import { signal, DestroyRef, inject } from "@angular/core";
 import { cacheStore } from "./cache-store";
 import { HttpQuery, HttpQueryError, QueryKey, QueryOptions } from "./types";
+import { toHttpQueryError } from "./utils";
 
 function resolveQueryKey(key: QueryKey): { cacheKey: string; url: string } {
   if (typeof key === "string") {
@@ -12,31 +13,9 @@ function resolveQueryKey(key: QueryKey): { cacheKey: string; url: string } {
   return { cacheKey, url };
 }
 
-function normalizeBody(body: any) {
-  if (body === undefined || body === null) return undefined;
-  return typeof body === "string" ? body : JSON.stringify(body);
-}
-
-function toHttpQueryError(err: unknown): HttpQueryError {
-  if (typeof err === "object" && err && "message" in err) {
-    const anyErr = err as any;
-    return {
-      message: String(anyErr.message ?? "Request failed"),
-      status: anyErr.status,
-      statusText: anyErr.statusText,
-      cause: err,
-    };
-  }
-
-  return {
-    message: "Request failed",
-    cause: err,
-  };
-}
-
-export function createHttpQuery<T>(
+export function createQuery<T>(
   key: QueryKey,
-  options: QueryOptions,
+  options: Omit<QueryOptions, "method">,
   fetchFn: typeof fetch = fetch
 ): HttpQuery<T> {
   const { cacheKey, url } = resolveQueryKey(key);
@@ -123,16 +102,8 @@ export function createHttpQuery<T>(
     try {
       const response = await fetchFn(url, {
         ...options,
-        method: options.method ?? "GET",
-        body: normalizeBody(options.body),
-        headers: {
-          ...(options.body &&
-          typeof options.body === "object" &&
-          !(options.body instanceof FormData)
-            ? { "Content-Type": "application/json" }
-            : {}),
-          ...(options.headers ?? {}),
-        },
+        method: "GET",
+        headers: options.headers,
         signal: abortController.signal,
       });
       if (!response.ok) {
