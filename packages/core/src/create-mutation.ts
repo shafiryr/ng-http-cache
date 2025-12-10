@@ -1,10 +1,18 @@
 import { createBaseMutation } from "./create-base-mutation";
 import { HttpMutation, HttpMutationOptions } from "./types";
-import { hasHeader, isPlainObject, serializeBody } from "./utils";
+import {
+  hasHeader,
+  isJsonSerializable,
+  parseJsonSafe,
+  serializeBody,
+} from "./utils";
+
+type UrlOrFn<TBody> = string | ((variables: TBody) => string);
 
 export function createMutation<TData, TBody = void>(
-  url: string,
-  options: HttpMutationOptions = {}
+  url: UrlOrFn<TBody>,
+  options: HttpMutationOptions = {},
+  fetchFn: typeof fetch = fetch
 ): HttpMutation<TData, TBody> {
   const {
     method = "POST",
@@ -26,17 +34,20 @@ export function createMutation<TData, TBody = void>(
     retry,
     retryDelay,
     mutationFn: async (body) => {
+      const resolvedUrl = typeof url === "function" ? url(body) : url;
+      const requestBody = serializeBody(body);
       const needsJsonContentType =
-        isPlainObject(body) && !hasHeader(headers, "Content-Type");
-
-      const res = await fetch(url, {
+        requestBody &&
+        isJsonSerializable(body) &&
+        !hasHeader(headers, "Content-Type");
+      const res = await fetchFn(resolvedUrl, {
         ...fetchOptions,
         method,
         headers: {
           ...(needsJsonContentType && { "Content-Type": "application/json" }),
           ...headers,
         },
-        body: serializeBody(body),
+        body: requestBody,
       });
 
       if (!res.ok) {
@@ -47,9 +58,7 @@ export function createMutation<TData, TBody = void>(
         };
       }
 
-      //return res.json();
-      const text = await res.text();
-      return text ? JSON.parse(text) : ({} as TData);
+      return parseJsonSafe<TData>(await res.text());
     },
   });
 }

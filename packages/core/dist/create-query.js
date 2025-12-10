@@ -1,5 +1,6 @@
 import { signal, DestroyRef, inject } from "@angular/core";
 import { cacheStore } from "./cache-store";
+import { toHttpQueryError } from "./utils";
 function resolveQueryKey(key) {
     if (typeof key === "string") {
         return { cacheKey: key, url: key };
@@ -8,27 +9,7 @@ function resolveQueryKey(key) {
     const cacheKey = JSON.stringify(key);
     return { cacheKey, url };
 }
-function normalizeBody(body) {
-    if (body === undefined || body === null)
-        return undefined;
-    return typeof body === "string" ? body : JSON.stringify(body);
-}
-function toHttpQueryError(err) {
-    if (typeof err === "object" && err && "message" in err) {
-        const anyErr = err;
-        return {
-            message: String(anyErr.message ?? "Request failed"),
-            status: anyErr.status,
-            statusText: anyErr.statusText,
-            cause: err,
-        };
-    }
-    return {
-        message: "Request failed",
-        cause: err,
-    };
-}
-export function createHttpQuery(key, options, fetchFn = fetch) {
+export function createQuery(key, options, fetchFn = fetch) {
     const { cacheKey, url } = resolveQueryKey(key);
     const data = signal(null);
     const loading = signal(false);
@@ -101,16 +82,8 @@ export function createHttpQuery(key, options, fetchFn = fetch) {
         try {
             const response = await fetchFn(url, {
                 ...options,
-                method: options.method ?? "GET",
-                body: normalizeBody(options.body),
-                headers: {
-                    ...(options.body &&
-                        typeof options.body === "object" &&
-                        !(options.body instanceof FormData)
-                        ? { "Content-Type": "application/json" }
-                        : {}),
-                    ...(options.headers ?? {}),
-                },
+                method: "GET",
+                headers: options.headers,
                 signal: abortController.signal,
             });
             if (!response.ok) {

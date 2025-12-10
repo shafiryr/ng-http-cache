@@ -19,7 +19,7 @@ export function hasHeader(
   );
 }
 
-export function isPlainObject(value: unknown): boolean {
+export function isJsonSerializable(value: unknown): boolean {
   return (
     value !== null &&
     value !== undefined &&
@@ -31,7 +31,30 @@ export function isPlainObject(value: unknown): boolean {
 
 export function serializeBody(body: unknown): BodyInit | undefined {
   if (body === undefined || body === null) return undefined;
-  return isPlainObject(body) ? JSON.stringify(body) : (body as BodyInit);
+
+  if (isJsonSerializable(body)) return JSON.stringify(body);
+
+  if (
+    body instanceof FormData ||
+    body instanceof Blob ||
+    typeof body === "string"
+  ) {
+    return body as BodyInit;
+  }
+
+  return undefined;
+}
+
+export function parseJsonSafe<T>(text: string): T {
+  if (!text) {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text as unknown as T;
+  }
 }
 
 export function toHttpQueryError(

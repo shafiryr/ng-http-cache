@@ -22,11 +22,13 @@ A lightweight, Signal-powered HTTP caching library for Angular.
 
 🧹 **Auto Cleanup** — Automatic cache cleanup via Angular `DestroyRef`
 
-📝 **Mutations** — Full support for POST/PUT/DELETE with state tracking
+📝 **Mutations** — Full support for POST/PUT/PATCH/DELETE with state tracking
 
 🔁 **Retry Support** — Configurable retry with exponential backoff
 
 🎯 **Race Condition Prevention** — Force refresh aborts previous pending requests
+
+🗑️ **Cache Invalidation** — Automatically invalidate queries after mutations
 
 ---
 
@@ -117,7 +119,7 @@ Each unique combination creates a separate cache entry, perfect for:
 
 ## ✏️ Mutations
 
-Use `createMutation` for data modifications (POST, PUT, DELETE).
+Use `createMutation` for data modifications (POST, PUT, PATCH, DELETE).
 
 ### Basic Mutation
 
@@ -134,9 +136,21 @@ const updateUser = createMutation<User, UpdateUserDto>("/api/users", {
 
 ---
 
-### Mutation with Retry
+### Mutation with Dynamic URL
+
+For DELETE/PUT/PATCH where the ID is in the URL:
+
+```ts
+const deleteTodo = createMutation<void, number>((id) => `/api/todos/${id}`, {
+  method: "DELETE",
+});
+
+deleteTodo.mutate(5); // DELETE /api/todos/5
+```
 
 ---
+
+### Mutation with Retry
 
 ```ts
 const submitForm = createMutation<Response, FormData>("/api/submit", {
@@ -191,7 +205,7 @@ export class TodosComponent implements OnInit {
     onSuccess: () => this.todosQuery.fetch(true),
   });
 
-  deleteMutation = createMutation<void, string>("/api/todos", {
+  deleteMutation = createMutation<void, string>((id) => `/api/todos/${id}`, {
     method: "DELETE",
     invalidateKeys: ["/api/todos"],
   });
@@ -224,32 +238,65 @@ By default, the library uses the native browser `fetch` API. To use Angular's `H
 
 This is **optional** - the library does **not** require `HttpClient`.
 
-### HttpClient → Fetch Adapter
+### HttpClient Adapter
 
 ```ts
-// http-client-fetch-adapter.ts
+// http-client-adapter.ts
 
 import { inject } from "@angular/core";
-import { HttpClient } from "@angular/common/http";
-import { firstValueFrom } from "rxjs";
+import { HttpClient, HttpErrorResponse } from "@angular/common/http";
+import { firstValueFrom, catchError, of } from "rxjs";
 
-export function httpClientFetchAdapter(url: string, init?: RequestInit) {
+export function httpClientAdapter(url: string, init?: RequestInit) {
   const http = inject(HttpClient);
 
   const method = init?.method ?? "GET";
-  const body = init?.body ? JSON.parse(init.body as string) : undefined;
-  const headers = init?.headers ?? {};
+  const headers = init?.headers as Record<string, string> | undefined;
+
+  let body: any = undefined;
+  if (init?.body) {
+    if (typeof init.body === "string") {
+      try {
+        body = JSON.parse(init.body);
+      } catch {
+        body = init.body;
+      }
+    } else {
+      body = init.body;
+    }
+  }
 
   return firstValueFrom(
-    http.request(method, url, {
-      body,
-      headers,
-      responseType: "json",
-    })
-  ).then((data) => {
+    http
+      .request<unknown>(method, url, {
+        body,
+        headers,
+        observe: "response",
+        responseType: "json",
+      })
+      .pipe(
+        catchError((err: HttpErrorResponse) => {
+          return of({
+            ok: false,
+            status: err.status,
+            statusText: err.statusText,
+            body: err.error,
+          } as any);
+        })
+      )
+  ).then((response: any) => {
+    const responseBody = response.body;
+    const bodyText =
+      typeof responseBody === "string"
+        ? responseBody
+        : JSON.stringify(responseBody ?? "");
+
     return {
-      ok: true,
-      json: () => Promise.resolve(data),
+      ok: response.ok ?? (response.status >= 200 && response.status < 300),
+      status: response.status,
+      statusText: response.statusText,
+      json: () => Promise.resolve(responseBody),
+      text: () => Promise.resolve(bodyText), // ← Required for createMutation
     } as Response;
   });
 }
@@ -257,19 +304,24 @@ export function httpClientFetchAdapter(url: string, init?: RequestInit) {
 
 ### Using the Adapter
 
-Pass your adapter as the third argument to `createQuery`:
+Pass your adapter as the third argument to `createQuery` or `createMutation`:
 
 ```ts
 import { createQuery } from "@shafiryr/signal-http-cache";
-import { httpClientFetchAdapter } from "./http-client-fetch-adapter";
+import { httpClientAdapter } from "./http-client-adapter";
 
-query = createQuery<Item[]>(
-  "/api/items",
-  {
-    ttl: 60000,
-    staleWhileRevalidate: true,
-  },
-  httpClientFetchAdapter
+// Query
+const users = createQuery<User[]>(
+  "/api/users",
+  { ttl: 60000 },
+  httpClientAdapter
+);
+
+// Mutation
+const addUser = createMutation<User, { name: string }>(
+  "/api/users",
+  { onSuccess: () => users.fetch(true) },
+  httpClientAdapter
 );
 ```
 

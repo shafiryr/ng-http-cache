@@ -1,7 +1,7 @@
 import { signal, DestroyRef, inject } from "@angular/core";
 import { cacheStore } from "./cache-store";
 import { HttpQuery, HttpQueryError, QueryKey, QueryOptions } from "./types";
-import { toHttpQueryError } from "./utils";
+import { parseJsonSafe, toHttpQueryError } from "./utils";
 
 function resolveQueryKey(key: QueryKey): { cacheKey: string; url: string } {
   if (typeof key === "string") {
@@ -15,10 +15,11 @@ function resolveQueryKey(key: QueryKey): { cacheKey: string; url: string } {
 
 export function createQuery<T>(
   key: QueryKey,
-  options: Omit<QueryOptions, "method">,
+  options: Omit<QueryOptions, "method"> = {},
   fetchFn: typeof fetch = fetch
 ): HttpQuery<T> {
   const { cacheKey, url } = resolveQueryKey(key);
+  const ttl = options.ttl ?? 0;
   const data = signal<T | null>(null);
   const loading = signal(false);
   const error = signal<HttpQueryError | null>(null);
@@ -57,7 +58,7 @@ export function createQuery<T>(
     }
 
     if (cached && !force) {
-      const expired = Date.now() - cached.timestamp > options.ttl;
+      const expired = Date.now() - cached.timestamp > ttl;
 
       if (!expired) {
         error.set(null);
@@ -67,7 +68,8 @@ export function createQuery<T>(
       if (options.staleWhileRevalidate) {
         error.set(null);
         data.set(cached.data);
-        return revalidate();
+        revalidate();
+        return;
       }
     }
 
@@ -93,7 +95,7 @@ export function createQuery<T>(
     cacheStore.set(cacheKey, {
       data: previous?.data ?? null,
       timestamp: previous?.timestamp ?? 0,
-      ttl: options.ttl,
+      ttl: ttl,
       inFlight: inFlightPromise,
       abortController,
       refCount: previous?.refCount ?? 1,
@@ -113,12 +115,13 @@ export function createQuery<T>(
           statusText: response.statusText,
         };
       }
-      const json = (await response.json()) as T;
+
+      const json = parseJsonSafe<T>(await response.text());
 
       cacheStore.set(cacheKey, {
         data: json,
         timestamp: Date.now(),
-        ttl: options.ttl,
+        ttl: ttl,
         inFlight: undefined,
         abortController: undefined,
         refCount: cacheStore.get<T>(cacheKey)?.refCount ?? 1,

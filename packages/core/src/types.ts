@@ -16,7 +16,7 @@ export interface HttpQuery<T> {
 }
 
 export interface QueryOptions extends Omit<RequestInit, "method" | "body"> {
-  ttl: number;
+  ttl?: number;
   staleWhileRevalidate?: boolean;
 }
 

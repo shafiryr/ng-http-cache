@@ -1,6 +1,6 @@
 {
   "name": "@shafiryr/signal-http-cache",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shafiryr/ng-http-cache.git"
@@ -15,7 +15,9 @@
   "types": "./dist/index.d.ts",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

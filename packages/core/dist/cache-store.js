@@ -3,6 +3,12 @@ export const cacheStore = {
     get(key) {
         return cache.get(key);
     },
+    has(key) {
+        return cache.has(key);
+    },
+    keys() {
+        return Array.from(cache.keys());
+    },
     set(key, entry) {
         cache.set(key, entry);
     },
@@ -33,5 +39,8 @@ export const cacheStore = {
             }
         }
         return false;
+    },
+    size() {
+        return cache.size;
     },
 };
